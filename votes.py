@@ -3,7 +3,7 @@ import os
 import requests
 import json
 
-PROPUBLICA_API_KEY = "ADlxAe4YWWQTFEF6oVreM9egfS4uMeWbAV6RWRhf"
+PROPUBLICA_API_KEY = "YOURS HERE"
 
 
 class Member:
