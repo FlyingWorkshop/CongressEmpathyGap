@@ -7,3 +7,6 @@ in varsious wikipedia articles; the exploration feature hopefully provides great
 
 NOTE: This project was inspired by a class I took in 2021 with Prof. Dan Jurafsky; the original motivation, however, came from a paper I read in an English class
 taught by Prof. Rebecca Richardson.
+
+
+TODO: implement bigrams, use twitter data, use sen/reps data and scale ngram count by dw-nominate
