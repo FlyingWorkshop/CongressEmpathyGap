@@ -11,103 +11,86 @@ import os
 import csv
 import re
 
-# TODO: find out why de-serialization is so slow by debug create training
-# TODO: increase unigram probability by debugging classify and train; fix likelihood!
+
 # TODO: implement bigrams
+# TODO: train off wikis for senators/house reps and use their DW-nominate as a weighted average
 
 
 # TODO: use special tweet tokenizer!
 class NaiveBayesClassifier:
     TRAINING_FILE = "data/united_states_governors_1775_2020.csv"
-    USE_GOVERNORS_BETWEEN = (1945, 2030)
+    DATES = (1990, 2030)
+    STEMMER = SnowballStemmer("english")
 
-    def __init__(self, training_ratio=0.7, custom_stop_words=2, include_third_parties=True):
-        self.stemmer = SnowballStemmer("english")
-        self.stop_words = self.make_stop_words()
-        if include_third_parties:
-            self.data = [ClassData(p) for p in Party]
-        else:
+    def __init__(self, use_third_parties=False):
+        self.stop_words = set(stopwords.words("english") + [WikipediaBiography.FILLER])
+        self.data = self.data = [ClassData(par) for par in Party]
+        if not use_third_parties:
+            self.data.pop()  # removes third party ClassData() object from self.data
             self.data = [ClassData(p) for p in Party if p != Party.OTHER]
 
-        print("### Compiling corpus. This may take awhile...")
-        corpus = self.make_training_corpus(NaiveBayesClassifier.TRAINING_FILE, include_third_parties)
-        print("### Finished compiling corpus!")
-        b = int(len(corpus) * training_ratio)
-        training_corpus = corpus[:b]
-        dev_corpus = corpus[b:]
+        self.training_corpus = []
+        self.get_training_corpus(use_third_parties)
 
-        print("### Training model. This should only take a few seconds...")
-        self.train(training_corpus, custom_stop_words)
-        print("### Finished training model!")
+        self.train()
+        self.classify([])
 
-        guesses = self.classify(dev_corpus)
-        self.display_accuracy(guesses, dev_corpus)
-
-        print("### Exploration Mode:")
+        # self.display_accuracy
         self.exploration()
 
-    @staticmethod
-    def make_stop_words():
-        result = set(stopwords.words("english"))
-        result.add(WikipediaBiography.FILLER)
-        return result
-
-    @staticmethod
-    def make_training_corpus(training_file: str, include_third_parties: bool) -> list[WikipediaBiography]:
-        corpus = []
-        print("DATE RANGE:")
-        print("\t" + str(NaiveBayesClassifier.USE_GOVERNORS_BETWEEN))
-        with open(training_file) as csvfile:
+    def get_training_corpus(self, use_third_parties: bool) -> None:
+        print("### Compiling corpus. This may take awhile...")
+        print(f"DATE RANGE: {NaiveBayesClassifier.DATES}")
+        with open(NaiveBayesClassifier.TRAINING_FILE) as csvfile:
             reader = csv.reader(csvfile)
             next(reader)  # skip header
             seen = set()
             for row in reader:
-                name = row[0]
+                name, party = row[0], row[3]
                 if name in seen:
                     continue
-                time_in_office = tuple(map(int, row[2].split(" - ")))
-                if (time_in_office[0] < NaiveBayesClassifier.USE_GOVERNORS_BETWEEN[0] or
-                        time_in_office[1] > NaiveBayesClassifier.USE_GOVERNORS_BETWEEN[1]):
+                dates = tuple(map(int, row[2].split(" - ")))
+                if dates[0] < NaiveBayesClassifier.DATES[0] or dates[1] > NaiveBayesClassifier.DATES[1]:
                     continue
-                if row[3] == "Democrat":
-                    party = Party.DEMOCRAT
-                elif row[3] == "Republican":
-                    party = Party.REPUBLICAN
-                elif include_third_parties:
-                    party = Party.OTHER
                 filename = "data/cache/" + name.replace(" ", "_") + ".txt"
                 text = None
                 if os.path.exists(filename):
                     with open(filename) as f:
-                        text = ' '.join(list(f))
-                corpus.append(WikipediaBiography(name, party, text))
+                        text = list(f)[0]
+                if party == "Republican":
+                    party = Party.REPUBLICAN
+                elif party == "Democrat":
+                    party = Party.DEMOCRAT
+                elif use_third_parties:
+                    party = Party.OTHER
+                else:
+                    continue
+                self.training_corpus.append(WikipediaBiography(name, party, text))
                 seen.add(name)
-        return corpus
+        print("### Finished compiling corpus!")
 
-    def _preprocess(self, s: str) -> list[str]:
-        s = re.sub(re.compile(r"\[\d*]"), "", s)  # remove footnotes
-        result = []
-        for token in word_tokenize(s):
-            if token.isalpha():
-                stem = self.stemmer.stem(token)
-                if stem not in self.stop_words:
-                    result.append(stem)
-        return result
+    @staticmethod
+    def _preprocess(s: str, stop_words: set) -> list[str]:
+        s = re.sub(re.compile(r"\[\d*]"), "", s)  # remove footnotes, e.g. "This is a fact. [1]"
+        stems = [NaiveBayesClassifier.STEMMER.stem(token) for token in word_tokenize(s) if token.isalpha()]
+        return [word for word in stems if word not in stop_words]
 
-    def train(self, training_corpus: list[WikipediaBiography], custom_stop_words: int):
-        # calculate priors
-        v = len(training_corpus)
-        parties = [doc.party for doc in training_corpus]
-        for cd in self.data:
-            cd.prior = parties.count(cd.party) / v
-
-        # calculate raw ngram counts
-        for doc in training_corpus:
+    def train(self):
+        print("### Training model. This should only take a few seconds...")
+        # calculate raw ngram counts and the number of docs in each party
+        for doc in self.training_corpus:
             cd = self.data[doc.party.value]
-            for ngram in self._preprocess(doc.text):
+            cd.prior += 1
+            ngrams = self._preprocess(doc.text, self.stop_words)
+            for ngram in ngrams:
                 if ngram not in cd.counts:
                     cd.counts[ngram] = 0
                 cd.counts[ngram] += 1
+
+        # normalize priors
+        v = len(self.training_corpus)
+        for cd in self.data:
+            cd.prior /= v
 
         # merge class vocabularies
         corpus_vocab = set()
@@ -121,47 +104,39 @@ class NaiveBayesClassifier:
                     cd.likelihoods[ngram] = (cd.counts[ngram] + 1) / (v + len(cd.counts))
                 else:
                     cd.likelihoods[ngram] = 1 / (v + len(cd.counts))
-
-        # generate custom stop words
-        stop_words = {}
-        for cd in self.data:
-            for ngram in cd.counts:
-                if ngram not in stop_words:
-                    stop_words[ngram] = 0
-                stop_words[ngram] += cd.counts[ngram]
-        print("CUSTOM STOP WORDS:")
-        top_ngrams = [t[0] for t in sorted(stop_words.items(), key=itemgetter(1), reverse=True)][:custom_stop_words]
-        print("\t" + str(top_ngrams))
-        self.stop_words.update(top_ngrams)
+        print("### Finished training model!")
 
     def classify(self, dev_corpus: list[WikipediaBiography]):
+        print("### Classifying developer corpus...")
         guesses = []
         for doc in dev_corpus:
             probabilities = []
             for cd in self.data:
                 prob = np.log(cd.prior)
-                for ngram in self._preprocess(doc.text):
+                for ngram in self._preprocess(doc.text, self.stop_words):
                     if ngram in cd.likelihoods:
                         prob += np.log(cd.likelihoods[ngram])
                 probabilities.append((prob, cd.party))
             guesses.append(max(probabilities)[1])
+        print("### Finished classifying!")
         return guesses
 
     @staticmethod
     def display_accuracy(guesses: list[Party], documents: list[WikipediaBiography]):
-        correct = []
-        incorrect = []
+        correct, incorrect = [], []
         for guess, doc in zip(guesses, documents):
             if guess == doc.party:
                 correct.append(doc)
             else:
                 incorrect.append(doc)
+        num_correct, num_incorrect = len(correct), len(incorrect)
         print(f"Model made predictions for {len(documents)} documents.")
-        print(f"CORRECT: {len(correct)}")
-        print(f"INCORRECT: {len(incorrect)}")
-        print(f"Model Accuracy: {len(correct) / len(documents)}")
+        print(f"CORRECT: {num_correct}")
+        print(f"INCORRECT: {num_incorrect}")
+        print(f"Model Accuracy: {num_correct / num_incorrect}")
 
     def exploration(self):
+        print("### Exploration Mode:")
         while True:
             inp = input("Please type a word ('q' to exit): ")
             if inp == 'q':
