@@ -129,27 +129,27 @@ class NaiveBayesClassifier:
         for corpus in self.data:
             corpus.display()
         print("----")
-        print(f"Made {total_preds} predictions for {len(documents)} documents.")
-        print(f"# Actual Republicans: {rep_actual}")
-        print(f"# Actual Democrats: {dem_actual}")
+        print(f"Made {total_preds} predictions for {len(documents)} documents. "
+              f"Actual Republicans: {rep_actual}"
+              f"Actual Democrats: {dem_actual}")
         print("Unigrams: ")
-        print(f"\t Correctly predicted {uni_true_rep} out of {rep_actual} actual Republicans.")
-        print(f"\t Correctly predicted {uni_true_dem} out of {dem_actual} actual Democrats.")
-        print(f"\t Predicted {uni_rep_pred} Republicans with {uni_true_rep} correct and {uni_false_rep} incorrect")
-        print(f"\t Predicted {uni_dem_pred} Democrats with {uni_true_dem} correct and {uni_false_dem} incorrect.")
-        print(f"\t Republican Recall: {uni_true_rep / rep_actual}")
-        print(f"\t Republican Precision: {uni_true_rep / uni_rep_pred}")
-        print(f"\t Democrat Recall: {uni_true_dem / dem_actual}")
-        print(f"\t Democrat Precision: {uni_true_dem / uni_dem_pred}")
+        print(f"\t Predicted {uni_dem_pred} democrats when there were {dem_actual} democrats; "
+              f"{uni_true_dem} were correct and {uni_false_dem} were incorrect predictions."
+              f"\n\t Accuracy = {uni_true_dem} / {uni_dem_pred} = {uni_true_dem / uni_dem_pred}"
+              f"\n\t Recall   = {uni_true_dem} / {dem_actual} = {uni_true_dem / dem_actual}")
+        print(f"\t Predicted {uni_rep_pred} republicans when there were {rep_actual} republicans; "
+              f"{uni_true_rep} were correct and {uni_false_rep} were incorrect predictions."
+              f"\n\t Accuracy = {uni_true_rep} / {uni_rep_pred} = {uni_true_rep / uni_rep_pred}"
+              f"\n\t Recall   = {uni_true_rep} / {rep_actual} = {uni_true_rep / rep_actual}")
         print("Bigrams: ")
-        print(f"\t Correctly predicted {bi_true_rep} out of {rep_actual} actual Republicans.")
-        print(f"\t Correctly predicted {bi_true_dem} out of {dem_actual} actual Democrats.")
-        print(f"\t Predicted {bi_rep_pred} Republicans with {bi_true_rep} correct and {bi_false_rep} incorrect.")
-        print(f"\t Predicted {bi_dem_pred} Democrats with {bi_true_dem} correct and {bi_false_dem} incorrect.")
-        print(f"\t Republican Recall: {bi_true_rep / rep_actual}")
-        print(f"\t Republican Precision: {bi_true_rep / bi_rep_pred}")
-        print(f"\t Democrat Recall: {bi_true_dem / dem_actual}")
-        print(f"\t Democrat Precision: {bi_true_dem / bi_dem_pred}")
+        print(f"\t Predicted {bi_dem_pred} democrats when there were {dem_actual} democrats; "
+              f"{bi_true_dem} were correct and {bi_false_dem} were incorrect predictions."
+              f"\n\t Accuracy = {bi_true_dem} / {bi_dem_pred} = {bi_true_dem / bi_dem_pred}"
+              f"\n\t Recall   = {bi_true_dem} / {dem_actual} = {bi_true_dem / dem_actual}")
+        print(f"\t Predicted {bi_rep_pred} republicans when there were {rep_actual} democrats; "
+              f"{bi_true_rep} were correct and {uni_false_rep} were incorrect predictions."
+              f"\n\t Accuracy = {bi_true_rep} / {uni_rep_pred} = {bi_true_rep / bi_rep_pred}"
+              f"\n\t Recall   = {bi_true_rep} / {rep_actual} = {bi_true_rep / rep_actual}")
         print("----")
         print(f"Unigram Accuracy: {(uni_true_rep + uni_true_dem)/total_preds}")
         print(f"Bigram Accuracy: {(bi_true_rep + bi_true_dem)/total_preds}")
